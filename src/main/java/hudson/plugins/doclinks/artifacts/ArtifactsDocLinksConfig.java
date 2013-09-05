@@ -52,6 +52,14 @@ public class ArtifactsDocLinksConfig implements Describable<ArtifactsDocLinksCon
         return artifactsPattern;
     }
     
+    private String initialPath;
+    /**
+     * @return the initialPath
+     */
+    public String getInitialPath() {
+        return initialPath;
+    }
+    
     private String indexFile;
     /**
      * @return the indexFile
@@ -61,9 +69,10 @@ public class ArtifactsDocLinksConfig implements Describable<ArtifactsDocLinksCon
     }
     
     @DataBoundConstructor
-    public ArtifactsDocLinksConfig(String title, String artifactsPattern, String indexFile) {
+    public ArtifactsDocLinksConfig(String title, String artifactsPattern, String initialPath, String indexFile) {
         this.title = StringUtils.trim(title);
         this.artifactsPattern = StringUtils.trim(artifactsPattern);
+        this.initialPath = initialPath;
         this.indexFile = StringUtils.trim(indexFile);
     }
     

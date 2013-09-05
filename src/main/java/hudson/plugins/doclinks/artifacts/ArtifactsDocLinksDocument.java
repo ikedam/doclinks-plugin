@@ -26,7 +26,9 @@ package hudson.plugins.doclinks.artifacts;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLConnection;
+import java.util.Date;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -62,6 +64,14 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         return title;
     }
     
+    private String initialPath;
+    /**
+     * @return the initialPath
+     */
+    public String getInitialPath() {
+        return initialPath;
+    }
+    
     private String indexFile;
     /**
      * @return the indexFile
@@ -70,17 +80,22 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         return indexFile;
     }
     
+    private String id;
     public String getId() {
-        return getArtifactName();
+        return id;
     }
     
     public String getUrl() {
-        return Util.rawEncode(getId());
+        return (getInitialPath() != null)
+                ?String.format("%s/%s", Util.rawEncode(getId()), getInitialPath())
+                :Util.rawEncode(getId());
     }
     
-    public ArtifactsDocLinksDocument(String artifactName, String title, String indexFile) {
+    public ArtifactsDocLinksDocument(String id, String artifactName, String title, String initialPath, String indexFile) {
+        this.id = id;
         this.artifactName = artifactName;
         this.title = title;
+        this.initialPath = initialPath;
         this.indexFile = indexFile;
     }
     
@@ -93,7 +108,6 @@ public class ArtifactsDocLinksDocument implements ModelObject {
     public String getDisplayName() {
         return getTitle();
     }
-    
     
     protected AbstractBuild<?, ?> getBuild(StaplerRequest req) {
         AbstractBuild<?,?> build = req.findAncestorObject(AbstractBuild.class);
@@ -129,6 +143,13 @@ public class ArtifactsDocLinksDocument implements ModelObject {
             return;
         }
         
+        if (req.getDateHeader("If-Modified-Since") >= 0) {
+            if (req.getDateHeader("If-Modified-Since") <= artifact.lastModified()) {
+                resp.sendError(304);
+                return;
+            }
+        }
+        
         String path = req.getRestOfPath();
         if (path.startsWith("/")) {
             path = path.substring(1);
@@ -143,19 +164,44 @@ public class ArtifactsDocLinksDocument implements ModelObject {
             return;
         }
         
-        resp.setContentType(URLConnection.guessContentTypeFromName(entry.getName()));
-        IOUtils.copy(zip.getInputStream(entry), resp.getOutputStream());
+        resp.setContentType(guessContentType(zip, entry));
+        resp.setDateHeader("Last-Modified", artifact.lastModified());
+        InputStream is = zip.getInputStream(entry);
+        try {
+            IOUtils.copy(is, resp.getOutputStream());
+        } finally {
+            is.close();
+        }
         return;
     }
     
-    private ZipEntry getFileEntry(ZipFile zip, String path) {
+    protected String guessContentType(ZipFile zip, ZipEntry entry) throws IOException
+    {
+        String contentType = URLConnection.guessContentTypeFromName(entry.getName());
+        if (contentType != null) {
+            return contentType;
+        }
+        
+        InputStream is = zip.getInputStream(entry);
+        try {
+            contentType = URLConnection.guessContentTypeFromStream(is);
+            if (contentType != null) {
+                return contentType;
+            }
+        } finally {
+            is.close();
+        }
+        
+        return null;
+    }
+    
+    private ZipEntry getFileEntry(ZipFile zip, String path) throws IOException {
         if (!StringUtils.isEmpty(path)) {
             ZipEntry entry = zip.getEntry(path);
             if (entry == null) {
                 return null;
             }
-            
-            if (!entry.isDirectory()) {
+            if (!isDirectory(zip, entry)) {
                 return entry;
             }
         }
@@ -169,11 +215,23 @@ public class ArtifactsDocLinksDocument implements ModelObject {
             file = StringUtils.trim(file);
             String filePath = StringUtils.isEmpty(path)?file:String.format("%s/%s", path, file);
             ZipEntry entry = zip.getEntry(filePath);
-            if (entry != null && !entry.isDirectory()) {
+            if (entry != null && !isDirectory(zip, entry)) {
                 return entry;
             }
         }
         
         return null;
+    }
+    
+    private boolean isDirectory(ZipFile zip, ZipEntry entry) throws IOException {
+        if (entry.isDirectory()) {
+            return true;
+        }
+        InputStream is = zip.getInputStream(entry);
+        if (is == null) {
+            return true;
+        }
+        is.close();
+        return false;
     }
 }

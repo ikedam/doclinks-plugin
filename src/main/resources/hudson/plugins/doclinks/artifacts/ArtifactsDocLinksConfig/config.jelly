@@ -30,6 +30,9 @@ THE SOFTWARE.
     <f:textbox />
   </f:entry>
   <f:advanced>
+    <f:entry title="${%Initial Path}" field="initialPath">
+      <f:textbox />
+    </f:entry>
     <f:entry title="${%Index File}" field="indexFile">
       <f:textbox />
     </f:entry>

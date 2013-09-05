@@ -80,10 +80,12 @@ public class ArtifactsDocLinksPublisher extends Recorder {
                 
                 for (String file: ds.getIncludedFiles()) {
                     docList.add(new ArtifactsDocLinksDocument(
+                            String.format("%d", docList.size() + 1),
                             file, 
                             (ds.getIncludedFilesCount() <= 1)
                                 ?config.getTitle()
                                 :String.format("%s(%s)", config.getTitle(), file),
+                            config.getInitialPath(),
                             config.getIndexFile()
                     ));
                 }
