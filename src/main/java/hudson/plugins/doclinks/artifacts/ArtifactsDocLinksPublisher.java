@@ -26,9 +26,9 @@ package hudson.plugins.doclinks.artifacts;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
-import org.apache.tools.ant.DirectoryScanner;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 import hudson.Extension;
@@ -68,21 +68,18 @@ public class ArtifactsDocLinksPublisher extends Recorder {
             = new ArrayList<ArtifactsDocLinksDocument>();
         if (getArtifactsDocLinksConfigList() != null) {
             for (ArtifactsDocLinksConfig config: getArtifactsDocLinksConfigList()) {
-                DirectoryScanner ds = new DirectoryScanner();
-                ds.setBasedir(build.getArtifactsDir());
-                ds.setIncludes(new String[]{config.getArtifactsPattern()});
-                ds.scan();
+                Collection<String> files = config.scanArtifacts(build);
                 
-                if (ds.getIncludedFilesCount() <= 0) {
+                if (files.size() <= 0) {
                     listener.getLogger().println(String.format("ERROR: No artifacts found for %s", config.getArtifactsPattern()));
                     return false;
                 }
                 
-                for (String file: ds.getIncludedFiles()) {
+                for (String file: files) {
                     docList.add(new ArtifactsDocLinksDocument(
                             String.format("%d", docList.size() + 1),
                             file, 
-                            (ds.getIncludedFilesCount() <= 1)
+                            (files.size() <= 1)
                                 ?config.getTitle()
                                 :String.format("%s(%s)", config.getTitle(), file),
                             config.getInitialPath(),

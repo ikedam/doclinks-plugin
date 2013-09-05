@@ -24,16 +24,32 @@
 
 package hudson.plugins.doclinks.artifacts;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.zip.ZipFile;
+
+import org.apache.tools.ant.DirectoryScanner;
 import org.codehaus.plexus.util.StringUtils;
+import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.QueryParameter;
 
 import hudson.Extension;
+import hudson.matrix.MatrixProject;
 import hudson.model.Describable;
 import hudson.model.Descriptor;
+import hudson.model.AbstractBuild;
+import hudson.model.AbstractProject;
 import hudson.model.Hudson;
+import hudson.model.Result;
+import hudson.util.FormValidation;
 
 /**
- *
+ * An entry for artifact documents configured by a user.
  */
 public class ArtifactsDocLinksConfig implements Describable<ArtifactsDocLinksConfig> {
     private String title;
@@ -46,6 +62,8 @@ public class ArtifactsDocLinksConfig implements Describable<ArtifactsDocLinksCon
     
     private String artifactsPattern;
     /**
+     * Returns ant file name pattern to specify artifacts.
+     * 
      * @return the artifactsPattern
      */
     public String getArtifactsPattern() {
@@ -54,6 +72,8 @@ public class ArtifactsDocLinksConfig implements Describable<ArtifactsDocLinksCon
     
     private String initialPath;
     /**
+     * The initial path when accessed to this artifact.
+     * 
      * @return the initialPath
      */
     public String getInitialPath() {
@@ -62,31 +82,186 @@ public class ArtifactsDocLinksConfig implements Describable<ArtifactsDocLinksCon
     
     private String indexFile;
     /**
+     * The file used for access to a directory.
+     * 
      * @return the indexFile
      */
     public String getIndexFile() {
         return indexFile;
     }
     
+    /**
+     * @param title
+     * @param artifactsPattern
+     * @param initialPath
+     * @param indexFile
+     */
     @DataBoundConstructor
     public ArtifactsDocLinksConfig(String title, String artifactsPattern, String initialPath, String indexFile) {
         this.title = StringUtils.trim(title);
         this.artifactsPattern = StringUtils.trim(artifactsPattern);
-        this.initialPath = initialPath;
+        this.initialPath = StringUtils.trim(initialPath);
         this.indexFile = StringUtils.trim(indexFile);
     }
     
-    @SuppressWarnings("unchecked")
+    /**
+     * @return
+     * @see hudson.model.Describable#getDescriptor()
+     */
     @Override
-    public Descriptor<ArtifactsDocLinksConfig> getDescriptor() {
-        return Hudson.getInstance().getDescriptor(getClass());
+    public DescriptorImpl getDescriptor() {
+        return (DescriptorImpl)Hudson.getInstance().getDescriptor(getClass());
     }
     
+    public Collection<String> scanArtifacts(AbstractBuild<?,?> build) {
+        return getDescriptor().scanArtifacts(build, getArtifactsPattern());
+    }
+    
+    /**
+     *
+     */
     @Extension
     public static class DescriptorImpl extends Descriptor<ArtifactsDocLinksConfig> {
+        /**
+         * @return
+         * @see hudson.model.Descriptor#getDisplayName()
+         */
         @Override
         public String getDisplayName() {
             return "Configuration Entry for ArtifactsDocLinksPublisher";
+        }
+        
+        public Collection<String> scanArtifacts(AbstractBuild<?,?> build, String artifactsPattern) {
+            DirectoryScanner ds = new DirectoryScanner();
+            ds.setBasedir(build.getArtifactsDir());
+            ds.setIncludes(artifactsPattern.split("\\s*,\\s*"));
+            ds.scan();
+            
+            return Arrays.asList(ds.getIncludedFiles());
+        }
+        
+        public FormValidation doCheckTitle(@QueryParameter String value) {
+            value = StringUtils.trim(value);
+            if (StringUtils.isEmpty(value)) {
+                return FormValidation.error(Messages.ArtifactsDocLinksConfig_title_required());
+            }
+            
+            return FormValidation.ok();
+        }
+        
+        private List<AbstractBuild<?,?>> getBuildsToCheckArtifacts(AbstractProject<?,?> project) {
+            List<AbstractProject<?,?>> projectList = new ArrayList<AbstractProject<?,?>>();
+            if (project instanceof MatrixProject) {
+                projectList.addAll(((MatrixProject)project).getActiveConfigurations());
+            } else {
+                projectList.add(project);
+            }
+            
+            // Retrieve builds containing artifacts
+            List<AbstractBuild<?,?>> buildList = new ArrayList<AbstractBuild<?,?>>();
+            for (AbstractProject<?,?> p: projectList) {
+                for (
+                        AbstractBuild<?,?> b = p.getLastBuild();
+                        b != null;
+                        b = b.getPreviousBuild()
+                ) {
+                    if (b.getResult().isBetterOrEqualTo(Result.SUCCESS)) {
+                        buildList.add(b);
+                        break;
+                    }
+                    File dir = b.getArtifactsDir();
+                    if (!dir.exists() || !dir.isDirectory() || dir.listFiles().length <= 0) {
+                        continue;
+                    }
+                    buildList.add(b);
+                }
+            }
+            
+            return buildList;
+        }
+        
+        public FormValidation doCheckArtifactsPattern(@QueryParameter String value, @AncestorInPath AbstractProject<?,?> project) {
+            value = StringUtils.trim(value);
+            if (StringUtils.isEmpty(value)) {
+                return FormValidation.error(Messages.ArtifactsDocLinksConfig_artifactsPattern_required());
+            }
+            
+            List<AbstractBuild<?,?>> buildList = getBuildsToCheckArtifacts(project);
+            if (buildList.isEmpty()) {
+                // There is no available builds.
+                return FormValidation.ok();
+            }
+            
+            OUTER:
+            for (String pattern: value.split("\\s*,\\s*")) {
+                for (AbstractBuild<?,?> build: buildList) {
+                    Collection<String> artifacts = scanArtifacts(build, pattern);
+                    if (artifacts.size() > 0) {
+                        for (String artifact: artifacts) {
+                            try {
+                                new ZipFile(new File(build.getArtifactsDir(), artifact));
+                            } catch(IOException e) {
+                                return FormValidation.warning(
+                                        Messages.ArtifactsDocLinksConfig_artifactsPattern_invalid(artifact, build.getFullDisplayName())
+                                );
+                            }
+                        }
+                        continue OUTER;
+                    }
+                }
+                return FormValidation.warning(Messages.ArtifactsDocLinksConfig_artifactsPattern_notfound(pattern));
+            }
+            
+            return FormValidation.ok();
+        }
+        
+        public FormValidation doCheckInitialPath(@QueryParameter String artifactsPattern, @QueryParameter String value, @AncestorInPath AbstractProject<?,?> project) {
+            artifactsPattern = StringUtils.trim(artifactsPattern);
+            value = StringUtils.trim(value);
+            if (StringUtils.isEmpty(artifactsPattern) || StringUtils.isEmpty(value)) {
+                return FormValidation.ok();
+            }
+            
+            List<AbstractBuild<?,?>> buildList = getBuildsToCheckArtifacts(project);
+            if (buildList.isEmpty()) {
+                // There is no available builds.
+                return FormValidation.ok();
+            }
+            
+            for (String pattern: artifactsPattern.split("\\*,\\*")) {
+                for (AbstractBuild<?,?> build: buildList) {
+                    for (String artifactName: scanArtifacts(build, pattern)) {
+                        File artifact = new File(build.getArtifactsDir(), artifactName);
+                        try {
+                            ZipFile file = new ZipFile(artifact);
+                            if (file.getEntry(value) == null) {
+                                return FormValidation.warning(
+                                        Messages.ArtifactsDocLinksConfig_initialPath_notfound(artifactName, build.getFullDisplayName())
+                                );
+                            }
+                        } catch(IOException e) {
+                            // ignore the file.
+                        }
+                    }
+                }
+            }
+            
+            return FormValidation.ok();
+        }
+        
+        @Override
+        public String getCheckUrl(String fieldName)
+        {
+            if ("initialPath".equals(fieldName)) {
+                String url = super.getCheckUrl(fieldName);
+                if (!url.contains("artifactsPattern")) {
+                    url
+                        +="+ '&artifactsPattern='"
+                        + "+ toValue(findPreviousFormItem(this, 'artifactsPattern'))";
+                }
+                return url;
+            }
+            return super.getCheckUrl(fieldName);
         }
     }
 }

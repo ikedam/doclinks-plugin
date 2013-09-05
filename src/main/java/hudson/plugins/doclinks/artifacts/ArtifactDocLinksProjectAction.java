@@ -24,17 +24,34 @@
 
 package hudson.plugins.doclinks.artifacts;
 
+import hudson.model.AbstractBuild;
+
 import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 
 /**
- *
+ * Action to show a link to artifact documents in side menu of projects.
  */
 public class ArtifactDocLinksProjectAction extends ArtifactDocsLinksActionBase {
+    /**
+     * Returns the {@link ArtifactsDocLinksAction} in the last build that have artifact documents.
+     * 
+     * Resolves the owner by {@link StaplerRequest#findAncestorObject(Class)}.
+     * 
+     * @param req
+     * @return the last {@link ArtifactDocLinksAction}. null if no proper build exists.
+     */
     public ArtifactsDocLinksAction getLastBuildAction(StaplerRequest req) {
-        return getBuild(req).getAction(ArtifactsDocLinksAction.class);
+        AbstractBuild<?,?> build = getBuild(req);
+        return (build != null)?build.getAction(ArtifactsDocLinksAction.class):null;
     }
     
+    /**
+     * An icon file used in the side menu of a project.
+     * 
+     * @return an icon path. null if no artifact documents are available.
+     * @see hudson.plugins.doclinks.artifacts.ArtifactDocsLinksActionBase#getIconFileName()
+     */
     @Override
     public String getIconFileName() {
         if (getBuild(Stapler.getCurrentRequest()) == null) {
@@ -52,6 +69,15 @@ public class ArtifactDocLinksProjectAction extends ArtifactDocsLinksActionBase {
         return Messages.ArtifactsDocLinksProjectAction_DisplayName();
     }
     
+    /**
+     * Returns {@link ArtifactsDocLinksDocument} specified by the URL.
+     * 
+     * Delegates to the last {@link ArtifactsDocLinksAction}.
+     * 
+     * @param token
+     * @param req
+     * @return
+     */
     public ArtifactsDocLinksDocument getDynamic(String token, StaplerRequest req) {
         return getLastBuildAction(req).getDynamic(token);
     }

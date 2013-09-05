@@ -30,22 +30,30 @@ import java.util.List;
 
 
 /**
- *
+ * An action to hold the link to artifact documents.
  */
 public class ArtifactsDocLinksAction extends ArtifactDocsLinksActionBase {
     private List<ArtifactsDocLinksDocument> artifactsDocLinksDocumentList
         = new ArrayList<ArtifactsDocLinksDocument>();
     /**
-     * @return the artifactsDocLinksDocumentList
+     * @return the list of artifact documents.
      */
     public List<ArtifactsDocLinksDocument> getArtifactsDocLinksDocumentList() {
         return artifactsDocLinksDocumentList;
     }
     
+    /**
+     * @param doc
+     * @return
+     */
     public boolean add(ArtifactsDocLinksDocument doc) {
         return getArtifactsDocLinksDocumentList().add(doc);
     }
     
+    /**
+     * @param docs
+     * @return
+     */
     public boolean addAll(Collection<ArtifactsDocLinksDocument> docs) {
         return getArtifactsDocLinksDocumentList().addAll(docs);
     }
@@ -59,6 +67,10 @@ public class ArtifactsDocLinksAction extends ArtifactDocsLinksActionBase {
         return Messages.ArtifactsDocLinksAction_DisplayName();
     }
     
+    /**
+     * @param token
+     * @return
+     */
     public ArtifactsDocLinksDocument getDynamic(String token) {
         for (ArtifactsDocLinksDocument doc: getArtifactsDocLinksDocumentList()) {
             if (token.equals(doc.getId())) {
