@@ -35,6 +35,7 @@ import hudson.Extension;
 import hudson.Launcher;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
+import hudson.model.Action;
 import hudson.model.BuildListener;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
@@ -102,6 +103,11 @@ public class ArtifactsDocLinksPublisher extends Recorder {
         action.addAll(docList);
         
         return true;
+    }
+    
+    @Override
+    public Action getProjectAction(AbstractProject<?, ?> project) {
+        return new ArtifactDocLinksProjectAction();
     }
     
     /**

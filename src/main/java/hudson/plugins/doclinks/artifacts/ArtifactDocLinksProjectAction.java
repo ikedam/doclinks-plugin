@@ -24,30 +24,23 @@
 
 package hudson.plugins.doclinks.artifacts;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
+import org.kohsuke.stapler.Stapler;
+import org.kohsuke.stapler.StaplerRequest;
 
 /**
  *
  */
-public class ArtifactsDocLinksAction extends ArtifactDocsLinksActionBase {
-    private List<ArtifactsDocLinksDocument> artifactsDocLinksDocumentList
-        = new ArrayList<ArtifactsDocLinksDocument>();
-    /**
-     * @return the artifactsDocLinksDocumentList
-     */
-    public List<ArtifactsDocLinksDocument> getArtifactsDocLinksDocumentList() {
-        return artifactsDocLinksDocumentList;
+public class ArtifactDocLinksProjectAction extends ArtifactDocsLinksActionBase {
+    public ArtifactsDocLinksAction getLastBuildAction(StaplerRequest req) {
+        return getBuild(req).getAction(ArtifactsDocLinksAction.class);
     }
     
-    public boolean add(ArtifactsDocLinksDocument doc) {
-        return getArtifactsDocLinksDocumentList().add(doc);
-    }
-    
-    public boolean addAll(Collection<ArtifactsDocLinksDocument> docs) {
-        return getArtifactsDocLinksDocumentList().addAll(docs);
+    @Override
+    public String getIconFileName() {
+        if (getBuild(Stapler.getCurrentRequest()) == null) {
+            return null;
+        }
+        return super.getIconFileName();
     }
     
     /**
@@ -56,16 +49,10 @@ public class ArtifactsDocLinksAction extends ArtifactDocsLinksActionBase {
      */
     @Override
     public String getDisplayName() {
-        return Messages.ArtifactsDocLinksAction_DisplayName();
+        return Messages.ArtifactsDocLinksProjectAction_DisplayName();
     }
     
-    public ArtifactsDocLinksDocument getDynamic(String token) {
-        for (ArtifactsDocLinksDocument doc: getArtifactsDocLinksDocumentList()) {
-            if (token.equals(doc.getId())) {
-                return doc;
-            }
-        }
-        
-        return null;
+    public ArtifactsDocLinksDocument getDynamic(String token, StaplerRequest req) {
+        return getLastBuildAction(req).getDynamic(token);
     }
 }

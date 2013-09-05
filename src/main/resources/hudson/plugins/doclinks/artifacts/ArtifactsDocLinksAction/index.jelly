@@ -23,15 +23,24 @@ THE SOFTWARE.
 -->
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+<j:set var="owner" value="${it.getOwner(request)}" />
+<j:set var="build" value="${it.getBuild(request)}" />
 <l:layout title="${it.displayName}">
   <st:include page="sidepanel.jelly" it="${it.getOwner(request)}"/>
   <l:main-panel>
     <h1>${it.displayName}</h1>
-    <ul>
-    <j:forEach var="doc" items="${it.artifactsDocLinksDocumentList}">
-      <li><a href="${doc.url}">${doc.title}</a></li>
-    </j:forEach>
-    </ul>
+    <j:if test="${owner != null}">
+      <j:if test="${owner != build}">
+      <div>
+        Built on <a href="${rootURL}/${build.url}">${build.fullDisplayName}</a>
+      </div>
+      </j:if>
+      <ul>
+      <j:forEach var="doc" items="${it.artifactsDocLinksDocumentList}">
+        <li><a href="${doc.url}">${doc.title}</a></li>
+      </j:forEach>
+      </ul>
+    </j:if>
   </l:main-panel>
 </l:layout>
 </j:jelly>

@@ -147,7 +147,7 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         IOUtils.copy(zip.getInputStream(entry), resp.getOutputStream());
         return;
     }
-
+    
     private ZipEntry getFileEntry(ZipFile zip, String path) {
         if (!StringUtils.isEmpty(path)) {
             ZipEntry entry = zip.getEntry(path);
