@@ -32,7 +32,7 @@ import java.util.List;
 /**
  * An action to hold the link to artifact documents.
  */
-public class ArtifactsDocLinksAction extends ArtifactDocsLinksActionBase {
+public class ArtifactsDocLinksAction extends ArtifactsDocsLinksActionBase {
     private List<ArtifactsDocLinksDocument> artifactsDocLinksDocumentList
         = new ArrayList<ArtifactsDocLinksDocument>();
     /**

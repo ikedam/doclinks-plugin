@@ -40,6 +40,7 @@ import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.BuildListener;
+import hudson.model.Result;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Publisher;
@@ -88,7 +89,8 @@ public class ArtifactsDocLinksPublisher extends Recorder {
                 
                 if (files.size() <= 0) {
                     listener.getLogger().println(String.format("ERROR: No artifacts found for %s", config.getArtifactsPattern()));
-                    return false;
+                    build.setResult(Result.FAILURE);
+                    return true;
                 }
                 
                 for (String file: files) {
@@ -97,7 +99,8 @@ public class ArtifactsDocLinksPublisher extends Recorder {
                         zip = new ZipFile(new File(build.getArtifactsDir(), file));
                     } catch(ZipException e) {
                         listener.getLogger().println(String.format("ERROR: %s seems not a zip file", file));
-                        return false;
+                        build.setResult(Result.FAILURE);
+                        return true;
                     } finally {
                         if (zip != null) {
                             zip.close();
@@ -120,7 +123,8 @@ public class ArtifactsDocLinksPublisher extends Recorder {
         
         if (docList.isEmpty()) {
             listener.getLogger().println("ERROR: No artifacts to publish as documents");
-            return false;
+            build.setResult(Result.FAILURE);
+            return true;
         }
         
         // For the case launched multiple times
@@ -141,7 +145,7 @@ public class ArtifactsDocLinksPublisher extends Recorder {
      */
     @Override
     public Action getProjectAction(AbstractProject<?, ?> project) {
-        return new ArtifactDocLinksProjectAction();
+        return new ArtifactsDocLinksProjectAction();
     }
     
     /**

@@ -9,7 +9,7 @@ import hudson.model.AbstractProject;
 /**
  * Common base class for {@link ArtifactDocsLinksAction} and {@link ArtifactDocLinksProjectAction}.
  */
-public abstract class ArtifactDocsLinksActionBase implements Action {
+public abstract class ArtifactsDocsLinksActionBase implements Action {
     /**
      * URL for this action.
      */
@@ -84,7 +84,7 @@ public abstract class ArtifactDocsLinksActionBase implements Action {
                 build != null;
                 build = build.getPreviousBuild()
         ) {
-            if (build.getAction(ArtifactDocsLinksActionBase.class) != null) {
+            if (build.getAction(ArtifactsDocsLinksActionBase.class) != null) {
                 return build;
             }
         }

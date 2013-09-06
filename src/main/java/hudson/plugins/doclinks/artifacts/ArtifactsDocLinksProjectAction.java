@@ -32,7 +32,7 @@ import org.kohsuke.stapler.StaplerRequest;
 /**
  * Action to show a link to artifact documents in side menu of projects.
  */
-public class ArtifactDocLinksProjectAction extends ArtifactDocsLinksActionBase {
+public class ArtifactsDocLinksProjectAction extends ArtifactsDocsLinksActionBase {
     /**
      * Returns the {@link ArtifactsDocLinksAction} in the last build that have artifact documents.
      * 

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.zip.ZipFile;
 
@@ -132,8 +133,12 @@ public class ArtifactsDocLinksConfig implements Describable<ArtifactsDocLinksCon
         }
         
         public Collection<String> scanArtifacts(AbstractBuild<?,?> build, String artifactsPattern) {
+            File dir = build.getArtifactsDir();
+            if (!dir.exists() || !dir.isDirectory()) {
+                return Collections.emptyList();
+            }
             DirectoryScanner ds = new DirectoryScanner();
-            ds.setBasedir(build.getArtifactsDir());
+            ds.setBasedir(dir);
             ds.setIncludes(artifactsPattern.split("\\s*,\\s*"));
             ds.scan();
             
