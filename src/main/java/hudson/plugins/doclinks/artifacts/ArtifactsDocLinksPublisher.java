@@ -24,10 +24,13 @@
 
 package hudson.plugins.doclinks.artifacts;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.zip.ZipException;
+import java.util.zip.ZipFile;
 
 import org.kohsuke.stapler.DataBoundConstructor;
 
@@ -55,15 +58,28 @@ public class ArtifactsDocLinksPublisher extends Recorder {
         return artifactsDocLinksConfigList;
     }
     
+    /**
+     * @param artifactsDocLinksConfigList
+     */
     @DataBoundConstructor
     public ArtifactsDocLinksPublisher(List<ArtifactsDocLinksConfig> artifactsDocLinksConfigList) {
         this.artifactsDocLinksConfigList = artifactsDocLinksConfigList;
     }
     
+    /**
+     * @param build
+     * @param launcher
+     * @param listener
+     * @return
+     * @throws InterruptedException
+     * @throws IOException
+     * @see hudson.tasks.BuildStepCompatibilityLayer#perform(hudson.model.AbstractBuild, hudson.Launcher, hudson.model.BuildListener)
+     */
     @Override
     public boolean perform(AbstractBuild<?, ?> build, Launcher launcher,
             BuildListener listener) throws InterruptedException, IOException {
         
+        listener.getLogger().println("Publishing artifacts as documents.");
         List<ArtifactsDocLinksDocument> docList
             = new ArrayList<ArtifactsDocLinksDocument>();
         if (getArtifactsDocLinksConfigList() != null) {
@@ -76,6 +92,19 @@ public class ArtifactsDocLinksPublisher extends Recorder {
                 }
                 
                 for (String file: files) {
+                    ZipFile zip = null;
+                    try {
+                        zip = new ZipFile(new File(build.getArtifactsDir(), file));
+                    } catch(ZipException e) {
+                        listener.getLogger().println(String.format("ERROR: %s seems not a zip file", file));
+                        return false;
+                    } finally {
+                        if (zip != null) {
+                            zip.close();
+                        }
+                    }
+                    
+                    listener.getLogger().println(file);
                     docList.add(new ArtifactsDocLinksDocument(
                             String.format("%d", docList.size() + 1),
                             file, 
@@ -94,6 +123,8 @@ public class ArtifactsDocLinksPublisher extends Recorder {
             return false;
         }
         
+        // For the case launched multiple times
+        // (it can be a case with Flexible Publish plugin).
         ArtifactsDocLinksAction action = build.getAction(ArtifactsDocLinksAction.class);
         if (action == null) {
             action = new ArtifactsDocLinksAction();
@@ -104,6 +135,10 @@ public class ArtifactsDocLinksPublisher extends Recorder {
         return true;
     }
     
+    /**
+     * @param project
+     * @return
+     */
     @Override
     public Action getProjectAction(AbstractProject<?, ?> project) {
         return new ArtifactDocLinksProjectAction();
@@ -118,19 +153,33 @@ public class ArtifactsDocLinksPublisher extends Recorder {
         return BuildStepMonitor.NONE;
     }
     
-    @SuppressWarnings("unchecked")
+    /**
+     * @return
+     */
     @Override
-    public BuildStepDescriptor<Publisher> getDescriptor() {
-        return super.getDescriptor();
+    public DescriptorImpl getDescriptor() {
+        return (DescriptorImpl)super.getDescriptor();
     }
     
+    /**
+     *
+     */
     @Extension
     public static class DescriptorImpl extends BuildStepDescriptor<Publisher> {
+        /**
+         * @param jobType
+         * @return
+         * @see hudson.tasks.BuildStepDescriptor#isApplicable(java.lang.Class)
+         */
         @Override
         public boolean isApplicable(@SuppressWarnings("rawtypes") Class<? extends AbstractProject> jobType) {
             return true;
         }
         
+        /**
+         * @return
+         * @see hudson.model.Descriptor#getDisplayName()
+         */
         @Override
         public String getDisplayName() {
             return Messages.ArtifactsDocLinksPublisher_DisplayName();

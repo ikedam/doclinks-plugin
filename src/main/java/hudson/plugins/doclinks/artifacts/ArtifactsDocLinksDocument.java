@@ -30,6 +30,7 @@ import java.io.InputStream;
 import java.net.URLConnection;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 import org.apache.commons.io.IOUtils;
@@ -43,7 +44,10 @@ import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 
 /**
- *
+ * Holds a link to an artifact published as a document.
+ * 
+ * The build that holds the artifact is resolved by {@link StaplerRequest#findAncestorObject(Class)}
+ * at runtime.
  */
 public class ArtifactsDocLinksDocument implements ModelObject {
     private static Logger LOGGER = Logger.getLogger(ArtifactsDocLinksDocument.class.getName());
@@ -80,16 +84,29 @@ public class ArtifactsDocLinksDocument implements ModelObject {
     }
     
     private String id;
+    /**
+     * @return the id used in URL.
+     */
     public String getId() {
         return id;
     }
     
+    /**
+     * @return the URL for the initial path.
+     */
     public String getUrl() {
         return (getInitialPath() != null)
                 ?String.format("%s/%s", Util.rawEncode(getId()), getInitialPath())
                 :Util.rawEncode(getId());
     }
     
+    /**
+     * @param id
+     * @param artifactName
+     * @param title
+     * @param initialPath
+     * @param indexFile
+     */
     public ArtifactsDocLinksDocument(String id, String artifactName, String title, String initialPath, String indexFile) {
         this.id = id;
         this.artifactName = artifactName;
@@ -108,6 +125,12 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         return getTitle();
     }
     
+    /**
+     * Resolves the build containing the artifact by {@link StaplerRequest#findAncestorObject(Class)}
+     * 
+     * @param req
+     * @return
+     */
     protected AbstractBuild<?, ?> getBuild(StaplerRequest req) {
         AbstractBuild<?,?> build = req.findAncestorObject(AbstractBuild.class);
         if (build != null) {
@@ -122,6 +145,13 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         return null;
     }
     
+    /**
+     * Send a contents of the artifact that is requested via HTTP.
+     * 
+     * @param req
+     * @param resp
+     * @throws IOException
+     */
     public void doDynamic(StaplerRequest req, StaplerResponse resp) throws IOException {
         AbstractBuild<?,?> build = getBuild(req);
         if (build == null) {
@@ -156,24 +186,43 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         if (path.endsWith("/")) {
             path = path.substring(0, path.length() - 1);
         }
-        ZipFile zip = new ZipFile(artifact);
-        ZipEntry entry = getFileEntry(zip, path);
-        if (entry == null) {
-            resp.sendError(404);
-            return;
-        }
-        
-        resp.setContentType(guessContentType(zip, entry));
-        resp.setDateHeader("Last-Modified", artifact.lastModified());
-        InputStream is = zip.getInputStream(entry);
+        ZipFile zip = null;
         try {
-            IOUtils.copy(is, resp.getOutputStream());
+            try {
+                zip = new ZipFile(artifact);
+            } catch (ZipException e) {
+                LOGGER.warning(String.format("Artifact is not a zip file: %s for %s", getArtifactName(), build.getFullDisplayName()));
+                resp.sendError(403);
+                return;
+            }
+            ZipEntry entry = getFileEntry(zip, path);
+            if (entry == null) {
+                resp.sendError(404);
+                return;
+            }
+            
+            resp.setContentType(guessContentType(zip, entry));
+            resp.setDateHeader("Last-Modified", artifact.lastModified());
+            InputStream is = zip.getInputStream(entry);
+            try {
+                IOUtils.copy(is, resp.getOutputStream());
+            } finally {
+                is.close();
+            }
+            return;
         } finally {
-            is.close();
+            if (zip != null) {
+                zip.close();
+            }
         }
-        return;
     }
     
+    /**
+     * @param zip
+     * @param entry
+     * @return
+     * @throws IOException
+     */
     protected String guessContentType(ZipFile zip, ZipEntry entry) throws IOException
     {
         String contentType = URLConnection.guessContentTypeFromName(entry.getName());
@@ -194,6 +243,12 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         return null;
     }
     
+    /**
+     * @param zip
+     * @param path
+     * @return
+     * @throws IOException
+     */
     private ZipEntry getFileEntry(ZipFile zip, String path) throws IOException {
         if (!StringUtils.isEmpty(path)) {
             ZipEntry entry = zip.getEntry(path);
@@ -222,6 +277,12 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         return null;
     }
     
+    /**
+     * @param zip
+     * @param entry
+     * @return
+     * @throws IOException
+     */
     private boolean isDirectory(ZipFile zip, ZipEntry entry) throws IOException {
         if (entry.isDirectory()) {
             return true;
