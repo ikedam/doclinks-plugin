@@ -27,13 +27,13 @@ package hudson.plugins.doclinks.artifacts;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URLConnection;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
-import org.apache.commons.io.IOUtils;
+import javax.servlet.ServletException;
+
 import org.codehaus.plexus.util.StringUtils;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
@@ -151,8 +151,9 @@ public class ArtifactsDocLinksDocument implements ModelObject {
      * @param req
      * @param resp
      * @throws IOException
+     * @throws ServletException 
      */
-    public void doDynamic(StaplerRequest req, StaplerResponse resp) throws IOException {
+    public void doDynamic(StaplerRequest req, StaplerResponse resp) throws IOException, ServletException {
         AbstractBuild<?,?> build = getBuild(req);
         if (build == null) {
             LOGGER.warning(String.format("No build found for url %s", req.getRequestURI()));
@@ -201,13 +202,14 @@ public class ArtifactsDocLinksDocument implements ModelObject {
                 return;
             }
             
-            resp.setContentType(guessContentType(zip, entry));
-            resp.setDateHeader("Last-Modified", artifact.lastModified());
-            InputStream is = zip.getInputStream(entry);
+            InputStream is = null;
             try {
-                IOUtils.copy(is, resp.getOutputStream());
+                is = zip.getInputStream(entry);
+                resp.serveFile(req, is, artifact.lastModified(), entry.getSize(), entry.getName());
             } finally {
-                is.close();
+                if (is != null) {
+                    is.close();
+                }
             }
             return;
         } finally {
@@ -215,32 +217,6 @@ public class ArtifactsDocLinksDocument implements ModelObject {
                 zip.close();
             }
         }
-    }
-    
-    /**
-     * @param zip
-     * @param entry
-     * @return
-     * @throws IOException
-     */
-    protected String guessContentType(ZipFile zip, ZipEntry entry) throws IOException
-    {
-        String contentType = URLConnection.guessContentTypeFromName(entry.getName());
-        if (contentType != null) {
-            return contentType;
-        }
-        
-        InputStream is = zip.getInputStream(entry);
-        try {
-            contentType = URLConnection.guessContentTypeFromStream(is);
-            if (contentType != null) {
-                return contentType;
-            }
-        } finally {
-            is.close();
-        }
-        
-        return null;
     }
     
     /**
