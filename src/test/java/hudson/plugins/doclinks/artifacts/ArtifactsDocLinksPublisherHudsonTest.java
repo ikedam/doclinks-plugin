@@ -24,13 +24,22 @@
 
 package hudson.plugins.doclinks.artifacts;
 
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.lang.StringUtils;
+import org.xml.sax.SAXException;
 
 import hudson.Util;
 import hudson.model.FreeStyleBuild;
+import hudson.model.AbstractBuild;
+import hudson.model.AbstractProject;
 import hudson.model.FreeStyleProject;
+import hudson.model.Result;
 import hudson.plugins.doclinks.artifacts.testtools.ArtifactDocLinksHudsonTestCase;
+import hudson.plugins.doclinks.artifacts.testtools.TestFileBuilder;
 import hudson.plugins.doclinks.artifacts.testtools.TestZipBuilder;
 import hudson.tasks.ArtifactArchiver;
 
@@ -43,6 +52,101 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 public class ArtifactsDocLinksPublisherHudsonTest extends ArtifactDocLinksHudsonTestCase {
     public static final int BUILD_TIMEOUT = 10;
     
+    protected void assertNoDocumentLink(AbstractProject<?,?> p)
+            throws IOException, SAXException {
+        // There is no link in project.
+        String url = p.getAction(ArtifactsDocLinksProjectAction.class).getUrlName();
+        WebClient wc = getWebClient();
+        HtmlPage page = wc.getPage(p);
+        for (HtmlAnchor a: page.getAnchors()) {
+            assertFalse(a.getHrefAttribute().contains(url));
+        }
+    }
+
+    protected void assertDocumentLink(AbstractProject<?,?> p)
+            throws IOException, SAXException
+    {
+        // There is a link in project.
+        String url = p.getAction(ArtifactsDocLinksProjectAction.class).getUrlName();
+        boolean found = false;
+        WebClient wc = getWebClient();
+        HtmlPage page = wc.getPage(p);
+        for (HtmlAnchor a: page.getAnchors()) {
+            if (a.getHrefAttribute().contains(url)) {
+                found = true;
+                break;
+            }
+        }
+        assertTrue(found);
+    }
+
+    protected void assertDocumentContains(AbstractBuild<?,?> build, int index, String path, String content)
+            throws IOException, SAXException
+    {
+        WebClient wc = getWebClient();
+        ArtifactsDocLinksAction action = build.getAction(ArtifactsDocLinksAction.class);
+        String url = null;
+        
+        if (StringUtils.isEmpty(path)) {
+            url = String.format(
+                    "%s/%s",
+                    action.getUrlName(),
+                    Util.rawEncode(action.getArtifactsDocLinksDocumentList().get(index).getId())
+            );
+        } else if (path.startsWith("/")) {
+            url = String.format(
+                    "%s/%s%s",
+                    action.getUrlName(),
+                    Util.rawEncode(action.getArtifactsDocLinksDocumentList().get(index).getId()),
+                    path
+            );
+        } else {
+            url = String.format(
+                    "%s/%s/%s",
+                    action.getUrlName(),
+                    Util.rawEncode(action.getArtifactsDocLinksDocumentList().get(index).getId()),
+                    path
+            );
+        }
+        
+        HtmlPage page = wc.getPage(build, url);
+        assertTrue(page.asText(), page.asText().contains(content));
+    }
+
+    protected void assertLatestDocumentContains(AbstractBuild<?,?> build, int index, String path, String content) throws IOException, SAXException
+    {
+        AbstractProject<?,?> p = build.getParent();
+        
+        WebClient wc = getWebClient();
+        ArtifactsDocLinksProjectAction action = p.getAction(ArtifactsDocLinksProjectAction.class);
+        ArtifactsDocLinksAction buildAction = build.getAction(ArtifactsDocLinksAction.class);
+        
+        String url = null;
+        if (StringUtils.isEmpty(path)) {
+            url = String.format(
+                    "%s/%s",
+                    action.getUrlName(),
+                    Util.rawEncode(buildAction.getArtifactsDocLinksDocumentList().get(index).getId())
+            );
+        } else if (path.startsWith("/")) {
+            url = String.format(
+                    "%s/%s%s",
+                    action.getUrlName(),
+                    Util.rawEncode(buildAction.getArtifactsDocLinksDocumentList().get(index).getId()),
+                    path
+            );
+        } else {
+            url = String.format(
+                    "%s/%s/%s",
+                    action.getUrlName(),
+                    Util.rawEncode(buildAction.getArtifactsDocLinksDocumentList().get(index).getId()),
+                    path
+            );
+        }
+        HtmlPage page = wc.getPage(p, url);
+        assertTrue(page.asText(), page.asText().contains(content));
+    }
+
     public void testPublishSingleArtifact() throws Exception {
         FreeStyleProject p = createFreeStyleProject();
         p.getPublishersList().add(new ArtifactArchiver("artifact1.zip", "", false));
@@ -55,56 +159,208 @@ public class ArtifactsDocLinksPublisherHudsonTest extends ArtifactDocLinksHudson
         p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
         
         assertNotNull(p.getAction(ArtifactsDocLinksProjectAction.class));
-        {
-            // There is no link in project.
-            String url = p.getAction(ArtifactsDocLinksProjectAction.class).getUrlName();
-            WebClient wc = new WebClient();
-            HtmlPage page = wc.getPage(p);
-            for(HtmlAnchor a: page.getAnchors()) {
-                assertFalse(a.getHrefAttribute().contains(url));
-            }
-        }
+        assertNoDocumentLink(p);
         
         FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
         assertBuildStatusSuccess(build);
         
         assertNotNull(build.getAction(ArtifactsDocLinksAction.class));
+        assertDocumentContains(build, 0, null, "Default top page.");
         
-        {
-            // There is a link in project.
-            String url = p.getAction(ArtifactsDocLinksProjectAction.class).getUrlName();
-            boolean found = false;
-            WebClient wc = new WebClient();
-            HtmlPage page = wc.getPage(p);
-            for(HtmlAnchor a: page.getAnchors()) {
-                if (a.getHrefAttribute().contains(url)) {
-                    found = true;
-                    break;
-                }
-            }
-            assertTrue(found);
-        }
-        {
-            WebClient wc = new WebClient();
-            ArtifactsDocLinksAction action = build.getAction(ArtifactsDocLinksAction.class);
-            HtmlPage page = wc.getPage(build, String.format(
-                    "%s/%s",
-                    action.getUrlName(),
-                    Util.rawEncode(action.getArtifactsDocLinksDocumentList().get(0).getId())
-            ));
-            assertTrue(page.asText(), page.asText().contains("Default top page."));
-        }
+        assertDocumentLink(p);
+        assertLatestDocumentContains(build, 0, null, "Default top page.");
         
-        {
-            WebClient wc = new WebClient();
-            ArtifactsDocLinksProjectAction action = p.getAction(ArtifactsDocLinksProjectAction.class);
-            ArtifactsDocLinksAction buildAction = build.getAction(ArtifactsDocLinksAction.class);
-            HtmlPage page = wc.getPage(p, String.format(
-                    "%s/%s",
-                    action.getUrlName(),
-                    Util.rawEncode(buildAction.getArtifactsDocLinksDocumentList().get(0).getId())
-            ));
-            assertTrue(page.asText(), page.asText().contains("Default top page."));
-        }
+        
+        // Try again!
+        p.getBuildersList().clear();
+        p.getPublishersList().clear();
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "artifact1.zip", null, "default.html")
+        )));
+        p.save();
+        updateTransientActions(p);
+        // Opening configure with TestZipBuilder causes 500.
+        p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+        
+        assertNotNull(p.getAction(ArtifactsDocLinksProjectAction.class));
+        assertDocumentLink(p);
+        
+        build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatusSuccess(build);
+        
+        assertNotNull(build.getAction(ArtifactsDocLinksAction.class));
+        assertDocumentContains(build, 0, null, "Alternate top page.");
+        
+        assertDocumentLink(p);
+        assertLatestDocumentContains(build, 0, null, "Alternate top page.");
+    }
+
+    public void testPublishNestedArtifact() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getPublishersList().add(new ArtifactArchiver("sub1/sub2/artifact1.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "sub1/sub2/artifact1.zip", null, null)
+        )));
+        p.save();
+        updateTransientActions(p);
+        // Opening configure with TestZipBuilder causes 500.
+        p.getBuildersList().add(new TestZipBuilder("sub1/sub2/artifact1.zip"));
+        
+        assertNotNull(p.getAction(ArtifactsDocLinksProjectAction.class));
+        assertNoDocumentLink(p);
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatusSuccess(build);
+        
+        assertNotNull(build.getAction(ArtifactsDocLinksAction.class));
+        assertDocumentContains(build, 0, null, "Default top page.");
+        
+        assertDocumentLink(p);
+        assertLatestDocumentContains(build, 0, null, "Default top page.");
+    }
+
+    public void testPublishMultipleArtifact1() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip,artifact2.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "artifact1.zip", null, null),
+                new ArtifactsDocLinksConfig("Test", "artifact2.zip", null, "default.html")
+        )));
+        p.save();
+        updateTransientActions(p);
+        // Opening configure with TestZipBuilder causes 500.
+        p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+        p.getBuildersList().add(new TestZipBuilder("artifact2.zip"));
+        
+        assertNotNull(p.getAction(ArtifactsDocLinksProjectAction.class));
+        assertNoDocumentLink(p);
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatusSuccess(build);
+        
+        assertNotNull(build.getAction(ArtifactsDocLinksAction.class));
+        assertDocumentContains(build, 0, null, "Default top page.");
+        assertDocumentContains(build, 1, null, "Alternate top page.");
+        
+        assertDocumentLink(p);
+        assertLatestDocumentContains(build, 0, null, "Default top page.");
+        assertLatestDocumentContains(build, 1, null, "Alternate top page.");
+    }
+
+    public void testPublishMultipleArtifact2() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip,artifact2.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "artifact1.zip,artifact2.zip", null, null)
+        )));
+        p.save();
+        updateTransientActions(p);
+        // Opening configure with TestZipBuilder causes 500.
+        p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+        p.getBuildersList().add(new TestZipBuilder("artifact2.zip"));
+        
+        assertNotNull(p.getAction(ArtifactsDocLinksProjectAction.class));
+        assertNoDocumentLink(p);
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatusSuccess(build);
+        
+        assertNotNull(build.getAction(ArtifactsDocLinksAction.class));
+        assertDocumentContains(build, 0, null, "Default top page.");
+        assertDocumentContains(build, 1, null, "Default top page.");
+        
+        assertDocumentLink(p);
+        assertLatestDocumentContains(build, 0, null, "Default top page.");
+        assertLatestDocumentContains(build, 1, null, "Default top page.");
+    }
+
+    public void testPublishMultipleArtifact3() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip,artifact2.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "*.zip", null, null)
+        )));
+        p.save();
+        updateTransientActions(p);
+        // Opening configure with TestZipBuilder causes 500.
+        p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+        p.getBuildersList().add(new TestZipBuilder("artifact2.zip"));
+        
+        assertNotNull(p.getAction(ArtifactsDocLinksProjectAction.class));
+        assertNoDocumentLink(p);
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatusSuccess(build);
+        
+        assertNotNull(build.getAction(ArtifactsDocLinksAction.class));
+        assertDocumentContains(build, 0, null, "Default top page.");
+        assertDocumentContains(build, 1, null, "Default top page.");
+        
+        assertDocumentLink(p);
+        assertLatestDocumentContains(build, 0, null, "Default top page.");
+        assertLatestDocumentContains(build, 1, null, "Default top page.");
+    }
+
+
+    public void testPerformSuccess() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "artifact1.zip", null, null)
+        )));
+        p.save();
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatusSuccess(build);
+    }
+
+    public void testPerformFailureForNull() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(null));
+        p.save();
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatus(Result.FAILURE, build);
+    }
+
+    public void testPerformFailureForEmpty() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Collections.<ArtifactsDocLinksConfig>emptyList()));
+        p.save();
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatus(Result.FAILURE, build);
+    }
+
+    public void testPerformFailureForNoMatch() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "artifactNone.zip", null, null)
+        )));
+        p.save();
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatus(Result.FAILURE, build);
+    }
+
+    public void testPerformFailureForNoZip() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getBuildersList().add(new TestFileBuilder("artifact1.zip", "Some proper content"));
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "artifact1.zip", null, null)
+        )));
+        p.save();
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatus(Result.FAILURE, build);
     }
 }

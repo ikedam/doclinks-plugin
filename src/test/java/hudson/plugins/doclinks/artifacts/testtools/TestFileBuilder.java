@@ -24,37 +24,40 @@
 
 package hudson.plugins.doclinks.artifacts.testtools;
 
-import org.jvnet.hudson.test.HudsonTestCase;
+import java.io.IOException;
 
-import hudson.model.AbstractProject;
+import hudson.FilePath;
+import hudson.Launcher;
+import hudson.model.AbstractBuild;
+import hudson.model.BuildListener;
+import hudson.tasks.Builder;
 
 /**
  *
  */
-public abstract class ArtifactDocLinksHudsonTestCase extends HudsonTestCase {
-    private WebClient aWebClient = null;
+public class TestFileBuilder extends Builder
+{
+    private String filename;
+    private String content;
+    
+    public TestFileBuilder(String filename, String content) {
+        this.filename = filename;
+        this.content = content;
+    }
     
     @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        aWebClient = null;
-    }
-    
-    protected synchronized WebClient getWebClient() {
-        if (aWebClient == null) {
-            aWebClient = createWebClient();
+    public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener)
+            throws InterruptedException, IOException {
+        FilePath file = build.getWorkspace().child(filename);
+        FilePath dir = file.getParent();
+        
+        if (dir != null && !dir.exists()) {
+            dir.mkdirs();
         }
-        return aWebClient;
+        
+        file.write(content, "UTF-8");
+        
+        return true;
     }
     
-    public WebClient createWebClient() {
-        WebClient wc = new WebClient();
-        wc.setTimeout(3000);
-        return wc;
-    }
-    
-    protected void updateTransientActions(AbstractProject<?,?> p) throws Exception {
-        WebClient wc = getWebClient();
-        submit(wc.getPage(p, "configure").getFormByName("config"));
-    }
 }
