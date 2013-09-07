@@ -168,7 +168,7 @@ public class ArtifactsDocLinksPublisher extends Recorder {
     /**
      *
      */
-    @Extension
+    @Extension(ordinal=-1) // This would be better to be displayed later than hudson.tasks.ArtifactArchiver
     public static class DescriptorImpl extends BuildStepDescriptor<Publisher> {
         /**
          * @param jobType

@@ -24,12 +24,9 @@
 
 package hudson.plugins.doclinks.artifacts.testtools;
 
+import org.jvnet.hudson.test.HudsonTestCase;
 
 import hudson.model.AbstractProject;
-
-import org.junit.Test;
-import org.jvnet.hudson.test.HudsonTestCase;
-import org.jvnet.hudson.test.TestEnvironment;
 
 /**
  *
