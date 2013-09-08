@@ -98,6 +98,8 @@ public class TestZipBuilder extends Builder
             File file = new File(dir, filename);
             String path = StringUtils.isEmpty(relative)?filename:String.format("%s/%s", relative, filename);
             if (file.isDirectory()) {
+                ZipEntry entry = new ZipEntry(String.format("%s/", path));
+                zos.putNextEntry(entry);
                 compress(zos, file, path);
             } else {
                 ZipEntry entry = new ZipEntry(path);

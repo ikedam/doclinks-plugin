@@ -302,6 +302,43 @@ public class ArtifactsDocLinksPublisherHudsonTest extends ArtifactDocLinksHudson
         assertLatestDocumentContains(build, 1, null, "Default top page.");
     }
 
+    public void testScanArtifacts() throws Exception {
+        {
+            FreeStyleProject p = createFreeStyleProject();
+            p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+            p.getBuildersList().add(new TestZipBuilder("artifact2.zip"));
+            p.getPublishersList().add(new ArtifactArchiver("artifact1.zip,artifact2.zip", "", false));
+            p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                    new ArtifactsDocLinksConfig("Test", "  *1.zip  ,  *2.zip   , *3.zip   ", null, null)
+            )));
+            p.save();
+            
+            FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+            assertBuildStatusSuccess(build);
+            
+            assertNotNull(build.getAction(ArtifactsDocLinksAction.class));
+            assertEquals(2, build.getAction(ArtifactsDocLinksAction.class).getArtifactsDocLinksDocumentList().size());
+            assertDocumentContains(build, 0, null, "Default top page.");
+            assertDocumentContains(build, 1, null, "Default top page.");
+        }
+        
+        {
+            FreeStyleProject p = createFreeStyleProject();
+            p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+            p.getPublishersList().add(new ArtifactArchiver("artifact1.zip,artifact2.zip", "", false));
+            p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                    new ArtifactsDocLinksConfig("Test", "  *1.zip  ,  *.zip   , artifact*.zip   ", null, null)
+            )));
+            p.save();
+            
+            FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+            assertBuildStatusSuccess(build);
+            
+            assertNotNull(build.getAction(ArtifactsDocLinksAction.class));
+            assertEquals(1, build.getAction(ArtifactsDocLinksAction.class).getArtifactsDocLinksDocumentList().size());
+            assertDocumentContains(build, 0, null, "Default top page.");
+        }
+    }
 
     public void testPerformSuccess() throws Exception {
         FreeStyleProject p = createFreeStyleProject();
@@ -351,7 +388,19 @@ public class ArtifactsDocLinksPublisherHudsonTest extends ArtifactDocLinksHudson
         assertBuildStatus(Result.FAILURE, build);
     }
 
-    public void testPerformFailureForNoZip() throws Exception {
+
+    public void testPerformFailureForNoArtifacts() throws Exception {
+        FreeStyleProject p = createFreeStyleProject();
+        p.getBuildersList().add(new TestZipBuilder("artifact1.zip"));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "*", null, null)
+        )));
+        p.save();
+        
+        FreeStyleBuild build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatus(Result.FAILURE, build);
+    }
+    public void testPerformFailureForNotZip() throws Exception {
         FreeStyleProject p = createFreeStyleProject();
         p.getBuildersList().add(new TestFileBuilder("artifact1.zip", "Some proper content"));
         p.getPublishersList().add(new ArtifactArchiver("artifact1.zip", "", false));

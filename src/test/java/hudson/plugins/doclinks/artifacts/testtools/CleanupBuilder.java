@@ -24,46 +24,24 @@
 
 package hudson.plugins.doclinks.artifacts.testtools;
 
-import org.jvnet.hudson.test.HudsonTestCase;
+import java.io.IOException;
 
-import hudson.model.AbstractProject;
+import hudson.FilePath;
+import hudson.Launcher;
+import hudson.model.AbstractBuild;
+import hudson.model.BuildListener;
+import hudson.tasks.Builder;
 
 /**
  *
  */
-public abstract class ArtifactDocLinksHudsonTestCase extends HudsonTestCase {
-    private WebClient aWebClient = null;
-    
+public class CleanupBuilder extends Builder {
     @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        aWebClient = null;
-    }
-    
-    /**
-     * Singleton for {@link WebClient}.
-     * 
-     * There seems no way to have {@link WebClient} close the connection.
-     * This causes Jenkins exhaust its connection pools
-     * when creating {@link WebClient} for each assertion step.
-     * 
-     * @return
-     */
-    protected synchronized WebClient getWebClient() {
-        if (aWebClient == null) {
-            aWebClient = createWebClient();
+    public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener)
+            throws InterruptedException, IOException {
+        for(FilePath path: build.getWorkspace().list()) {
+            path.deleteRecursive();
         }
-        return aWebClient;
-    }
-    
-    public WebClient createWebClient() {
-        WebClient wc = new WebClient();
-        wc.setTimeout(3000);
-        return wc;
-    }
-    
-    protected void updateTransientActions(AbstractProject<?,?> p) throws Exception {
-        WebClient wc = getWebClient();
-        submit(wc.getPage(p, "configure").getFormByName("config"));
+        return true;
     }
 }
