@@ -203,12 +203,21 @@ public class ArtifactsDocLinksConfig implements Describable<ArtifactsDocLinksCon
                     Collection<String> artifacts = scanArtifacts(build, pattern);
                     if (artifacts.size() > 0) {
                         for (String artifact: artifacts) {
+                            ZipFile file = null;
                             try {
-                                new ZipFile(new File(build.getArtifactsDir(), artifact));
+                                file = new ZipFile(new File(build.getArtifactsDir(), artifact));
                             } catch(IOException e) {
                                 return FormValidation.warning(
                                         Messages.ArtifactsDocLinksConfig_artifactsPattern_invalid(artifact, build.getFullDisplayName())
                                 );
+                            } finally {
+                                if (file != null) {
+                                    try {
+                                        file.close();
+                                    } catch(IOException e) {
+                                        // ignore
+                                    }
+                                }
                             }
                         }
                         continue OUTER;
@@ -233,21 +242,32 @@ public class ArtifactsDocLinksConfig implements Describable<ArtifactsDocLinksCon
                 return FormValidation.ok();
             }
             
-            for (String pattern: artifactsPattern.split("\\*,\\*")) {
-                for (AbstractBuild<?,?> build: buildList) {
-                    for (String artifactName: scanArtifacts(build, pattern)) {
-                        File artifact = new File(build.getArtifactsDir(), artifactName);
-                        try {
-                            ZipFile file = new ZipFile(artifact);
-                            if (file.getEntry(value) == null) {
-                                return FormValidation.warning(
-                                        Messages.ArtifactsDocLinksConfig_initialPath_notfound(artifactName, build.getFullDisplayName())
-                                );
+            for (AbstractBuild<?,?> build: buildList) {
+                Collection<String> artifactNames = scanArtifacts(build, artifactsPattern);
+                for (String artifactName: artifactNames) {
+                    File artifact = new File(build.getArtifactsDir(), artifactName);
+                    ZipFile file = null;
+                    try {
+                        file = new ZipFile(artifact);
+                        if (file.getEntry(value) == null) {
+                            return FormValidation.warning(
+                                    Messages.ArtifactsDocLinksConfig_initialPath_notfound(artifactName, build.getFullDisplayName())
+                            );
+                        }
+                    } catch(IOException e) {
+                        // ignore if file is not zip.
+                    } finally {
+                        if (file != null) {
+                            try {
+                                file.close();
+                            } catch(IOException e) {
+                                // ignore
                             }
-                        } catch(IOException e) {
-                            // ignore the file.
                         }
                     }
+                }
+                if (artifactNames.size() > 0) {
+                    break;
                 }
             }
             
