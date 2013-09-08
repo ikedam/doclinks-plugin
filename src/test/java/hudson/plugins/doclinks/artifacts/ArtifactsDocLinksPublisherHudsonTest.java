@@ -194,6 +194,28 @@ public class ArtifactsDocLinksPublisherHudsonTest extends ArtifactDocLinksHudson
         
         assertDocumentLink(p);
         assertLatestDocumentContains(build, 0, null, "Alternate top page.");
+        
+        // Failure
+        p.getBuildersList().clear();
+        p.getPublishersList().clear();
+        p.getPublishersList().add(new ArtifactArchiver("artifact1.zip", "", false));
+        p.getPublishersList().add(new ArtifactsDocLinksPublisher(Arrays.asList(
+                new ArtifactsDocLinksConfig("Test", "artifact1.zip", null, "default.html")
+        )));
+        p.save();
+        updateTransientActions(p);
+        
+        assertNotNull(p.getAction(ArtifactsDocLinksProjectAction.class));
+        assertDocumentLink(p);
+        
+        build = p.scheduleBuild2(0).get(BUILD_TIMEOUT, TimeUnit.SECONDS);
+        assertBuildStatusSuccess(build);
+        
+        assertNotNull(build.getAction(ArtifactsDocLinksAction.class));
+        assertDocumentContains(build, 0, null, "Alternate top page.");
+        
+        assertDocumentLink(p);
+        assertLatestDocumentContains(build, 0, null, "Alternate top page.");
     }
 
     public void testPublishNestedArtifact() throws Exception {

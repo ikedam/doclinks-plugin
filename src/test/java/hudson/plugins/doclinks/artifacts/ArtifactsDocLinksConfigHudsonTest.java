@@ -27,19 +27,19 @@ package hudson.plugins.doclinks.artifacts;
 import hudson.model.FreeStyleProject;
 import hudson.model.Result;
 import hudson.plugins.doclinks.artifacts.ArtifactsDocLinksConfig.DescriptorImpl;
+import hudson.plugins.doclinks.artifacts.testtools.ArtifactDocLinksHudsonTestCase;
 import hudson.plugins.doclinks.artifacts.testtools.CleanupBuilder;
 import hudson.plugins.doclinks.artifacts.testtools.TestFileBuilder;
 import hudson.plugins.doclinks.artifacts.testtools.TestZipBuilder;
 import hudson.tasks.ArtifactArchiver;
 import hudson.util.FormValidation;
 
-import org.jvnet.hudson.test.HudsonTestCase;
 import org.jvnet.hudson.test.UnstableBuilder;
 
 /**
  *
  */
-public class ArtifactsDocLinksConfigHudsonTest extends HudsonTestCase {
+public class ArtifactsDocLinksConfigHudsonTest extends ArtifactDocLinksHudsonTestCase {
     private DescriptorImpl getDescriptor() {
         return (DescriptorImpl)hudson.getDescriptor(ArtifactsDocLinksConfig.class);
     }
