@@ -77,7 +77,7 @@ public abstract class ArtifactsDocsLinksActionBase implements Action {
      * @param project
      * @return a build with artifact documents.
      */
-    protected AbstractBuild<?,?> getLastDocumentedBuild(
+    public AbstractBuild<?,?> getLastDocumentedBuild(
             AbstractProject<?, ?> project) {
         for (
                 AbstractBuild<?,?> build = project.getLastBuild();

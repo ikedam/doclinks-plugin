@@ -174,7 +174,7 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         }
         
         if (req.getDateHeader("If-Modified-Since") >= 0) {
-            if (req.getDateHeader("If-Modified-Since") <= artifact.lastModified()) {
+            if (req.getDateHeader("If-Modified-Since") >= artifact.lastModified()) {
                 resp.sendError(304);
                 return;
             }
@@ -196,6 +196,14 @@ public class ArtifactsDocLinksDocument implements ModelObject {
                 resp.sendError(403);
                 return;
             }
+            
+            if(path.length() > 0 && !req.getRequestURI().endsWith("/") && isDirectory(zip, path)) {
+                // It seems that getRestOfPath() never contains trailing slash.
+                // So we should see getRequestURI().
+                resp.sendRedirect(String.format("%s/", req.getRequestURI()));
+                return;
+            }
+            
             ZipEntry entry = getFileEntry(zip, path);
             if (entry == null) {
                 resp.sendError(404);
@@ -269,5 +277,22 @@ public class ArtifactsDocLinksDocument implements ModelObject {
         }
         is.close();
         return false;
+    }
+    
+    /**
+     * @param zip
+     * @param entry
+     * @return
+     * @throws IOException
+     */
+    private boolean isDirectory(ZipFile zip, String path) throws IOException {
+        if (StringUtils.isEmpty(path)) {
+            return true;
+        }
+        ZipEntry entry = zip.getEntry(path);
+        if (entry == null) {
+            return false;
+        }
+        return isDirectory(zip, entry);
     }
 }
